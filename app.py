@@ -4,12 +4,14 @@ import logging
 import pymysql
 from flask import Flask, request, jsonify
 from flask_cors import CORS
+from prometheus_flask_exporter import PrometheusMetrics
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger("ratings")
 
 app = Flask(__name__)
 CORS(app)
+PrometheusMetrics(app, group_by="endpoint")
 
 MYSQL_HOST = os.getenv("MYSQL_HOST", "mysql")
 MYSQL_USER = os.getenv("MYSQL_USER", "ratings")
