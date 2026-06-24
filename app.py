@@ -1,17 +1,76 @@
+import newrelic.agent
+newrelic.agent.initialize()
+
 import os
+import json
 import time
+import signal
 import logging
 import pymysql
-from flask import Flask, request, jsonify
+from flask import Flask, request, jsonify, g
 from flask_cors import CORS
 from prometheus_flask_exporter import PrometheusMetrics
 
-logging.basicConfig(level=logging.INFO)
+class JsonLogFormatter(logging.Formatter):
+    def format(self, record):
+        payload = {
+            "ts": time.strftime("%Y-%m-%dT%H:%M:%S", time.gmtime(record.created)) + f".{int(record.msecs):03d}Z",
+            "level": record.levelname.lower(),
+            "service": "ratings",
+            "msg": record.getMessage(),
+        }
+        if hasattr(record, "extra_fields"):
+            payload.update(record.extra_fields)
+        return json.dumps(payload)
+
+_handler = logging.StreamHandler()
+_handler.setFormatter(JsonLogFormatter())
+logging.basicConfig(level=logging.INFO, handlers=[_handler], force=True)
 logger = logging.getLogger("ratings")
+
+def jlog(level, msg, **extra):
+    rec = logger.makeRecord(logger.name, getattr(logging, level.upper()), "", 0, msg, None, None)
+    rec.extra_fields = extra
+    logger.handle(rec)
 
 app = Flask(__name__)
 CORS(app)
 PrometheusMetrics(app, group_by="endpoint")
+
+_req_seq = 0
+
+@app.before_request
+def _log_request_start():
+    global _req_seq
+    if request.path in ("/metrics", "/health"):
+        return
+    _req_seq += 1
+    g.req_id = request.headers.get("X-Request-ID") or f"{os.getpid()}-{_req_seq}"
+    g.req_start = time.monotonic()
+    jlog("info", "req.start", reqId=g.req_id, method=request.method, path=request.path,
+         remote=request.remote_addr)
+
+@app.after_request
+def _log_request_finish(response):
+    if request.path in ("/metrics", "/health"):
+        return response
+    dur_ms = round((time.monotonic() - g.req_start) * 1000, 1) if hasattr(g, "req_start") else None
+    jlog("info", "req.finish", reqId=getattr(g, "req_id", None), method=request.method, path=request.path,
+         status=response.status_code, durMs=dur_ms)
+    if hasattr(g, "req_id"):
+        response.headers["X-Request-ID"] = g.req_id
+    return response
+
+@app.teardown_request
+def _log_request_teardown(exc):
+    if exc is not None:
+        jlog("error", "req.error", reqId=getattr(g, "req_id", None), path=request.path, error=str(exc))
+
+def _sig_handler(signum, _frame):
+    jlog("warn", "server.shutdown.start", signal=signal.Signals(signum).name)
+
+signal.signal(signal.SIGTERM, _sig_handler)
+signal.signal(signal.SIGINT, _sig_handler)
 
 MYSQL_HOST = os.getenv("MYSQL_HOST", "mysql")
 MYSQL_USER = os.getenv("MYSQL_USER", "ratings")
