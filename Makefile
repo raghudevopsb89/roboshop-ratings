@@ -1,10 +1,16 @@
-.PHONY: build run docker-build db-init clean
+.PHONY: build run unit-test integration-test docker-build db-init clean
 
 build:
 	pip install -r requirements.txt
 
 run:
 	MYSQL_HOST=localhost python app.py
+
+unit-test:
+	pytest -m "not integration"
+
+integration-test:
+	pytest -m integration
 
 docker-build:
 	env
