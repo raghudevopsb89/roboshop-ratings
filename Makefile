@@ -28,3 +28,6 @@ db-init:
 
 clean:
 	find . -type d -name __pycache__ -exec rm -rf {} + 2>/dev/null || true
+
+sonar-scan:
+	/home/runner/sonar-scanner-7.1.0.4889-linux-x64/bin/sonar-scanner -Dsonar.projectKey=roboshop-ratings -Dsonar.host.url=http://10.1.0.46:9000 -Dsonar.token=sqa_a82ce4ca385f0ec1f5929abec8fb4fe2945a12c8 -Dsonar.qualitygate.wait=true -Dsonar.python.coverage.reportPaths=coverage.xml
