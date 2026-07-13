@@ -1,6 +1,7 @@
 # Dev/test dependencies for the ratings service.
 # Install alongside requirements.txt:  pip install -r requirements.txt -r requirements-dev.txt
 pytest==8.3.4
+pytest-cov==6.0.0
 # Already pinned in requirements.txt; listed so the suite can be installed standalone.
 flask==3.0.1
 flask-cors==4.0.0
