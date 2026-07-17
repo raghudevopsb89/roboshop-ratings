@@ -22,6 +22,9 @@ docker-build:
 docker-push:
 	docker push raghudevopsb89.azurecr.io/roboshop-ratings:${GITHUB_SHA}
 
+docker-scan:
+	trivy image raghudevopsb89.azurecr.io/roboshop-ratings:${GITHUB_SHA} --exit-code 1 --ignore-unfixed -s HIGH,CRITICAL
+
 db-init:
 	mysql -h $${MYSQL_HOST:-localhost} -u root -pRoboShop@1 < db/app-user.sql
 	mysql -h $${MYSQL_HOST:-localhost} -u root -pRoboShop@1 < db/schema.sql
